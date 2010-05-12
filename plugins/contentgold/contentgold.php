@@ -165,20 +165,14 @@ function _construct_subscriptions_url( $action, $params ) {
 
 function check_and_edit_subscription_status() {
   $status = get_subscription_status();
-  print "got status";
   if( $status->{'subscription_status'} == 'active' ) {
-    print "is active";
     // give user paid-subscriber role
     $dude = wp_get_current_user();
-    print "getting role";
     
     $role =& get_role('paid-subscriber');
     if( !isset( $role ) ) {
-      print "shit. didn't get role";
     } else  {
-      print "got role ";
-      $dude->set_role( $role );
-      print "set role";
+      $dude->set_role( 'paid-subscriber' );
     }
   }
   else {
@@ -188,7 +182,7 @@ function check_and_edit_subscription_status() {
 }
 function get_subscription_status() {
   $url = _construct_subscriptions_url( "status", array() );
-  print $url . "<br/>";
+  // print $url . "<br/>";
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
