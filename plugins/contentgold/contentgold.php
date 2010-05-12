@@ -14,10 +14,13 @@ function setup_paid_subscriber_role() {
   if( empty($role ) ) {
     add_role('paid-subscriber', 'Paid Subscriber');
     $role =& get_role('paid-subscriber');
-    $role->add_cap('read');
+    $role->add_cap('read_private_pages');
+    $role->add_cap('read_private_posts');
     $role->add_cap('level_0');
+    /*
     $role =& get_role('subscriber');
-    $role->remove_cap('read');
+    $role->remove_cap('read_private_pages');
+    */
   }
   }
 
@@ -25,14 +28,16 @@ function unsetup_paid_subscriber_role() {
   $role =& get_role('paid-subscriber');
   if( !empty($role ) ) {
     $role =& get_role('paid-subscriber');
-    $role->remove_cap('read');
+    $role->remove_cap('read_private_pages');
+    $role->remove_cap('read_private_posts');
     $role->remove_cap('level_0');
+    /*
     $role =& get_role('subscriber');
-    $role->add_cap('read');
+    $role->add_cap('read_private_pages');
+    */
     remove_role('paid-subscriber', 'Paid Subscriber');
   }
   }
-
 
 
 register_activation_hook( __FILE__, 'setup_paid_subscriber_role' );
@@ -97,6 +102,7 @@ function contentgold_settings_page() {
 
 add_action('admin_menu', 'contentgold_plugin_menu');
 function display_subscription_frame() {
+
   $offer_id = get_option('offer_id');
   $merchant_secret = get_option('merchant_secret');
   $dude = wp_get_current_user();
@@ -109,14 +115,91 @@ function display_subscription_frame() {
 		   "user_id" => $user_id
 		   );
   $signature =_calculateSGSignature( $sigparams, $merchant_secret );
-  if( $user_id == 0 ) {
-    // TODO: Handle this!
-  }
-    
+
 ?>
-  <iframe src="https://api.jambool.com/socialgold/subscription/v1/<?php echo $offer_id; ?>/<?php echo $user_id ?>/show_form?ts=<?php echo $ts ?>&sig=<?php echo $signature ?>" width="430" height="400" scrolling="no" style="border: 1px solid #ccc;"></iframe>
+  <iframe src="https://api.sandbox.jambool.com/socialgold/subscription/v1/<?php echo $offer_id; ?>/<?php echo $user_id ?>/show_form?ts=<?php echo $ts ?>&sig=<?php echo $signature ?>" width="430" height="400" scrolling="no" style="border: 1px solid #ccc;"></iframe>
 <?php
 }
+
+
+/*
+ footer
+*/
+
+add_action( 'wp_footer', 'show_subscription_frame_in_footer' );
+function show_subscription_frame_in_footer() {
+  check_and_edit_subscription_status();
+  display_subscription_frame();
+}
+
+function _construct_subscriptions_url( $action, $params ) {
+  $offer_id = get_option('offer_id');
+  $merchant_secret = get_option('merchant_secret');
+
+  $offer_id = get_option('offer_id');
+  $merchant_secret = get_option('merchant_secret');
+  $dude = wp_get_current_user();
+  $user_id = $dude->ID;
+  $ts = time();
+
+  $sparams = $params;
+
+  $sparams['action']  = $action;
+  $sparams['subscription_offer_id'] = $offer_id;
+  $sparams['user_id'] = $user_id;
+  
+  $sparams['ts'] = $ts;
+  $signature =_calculateSGSignature( $sparams, $merchant_secret );
+
+  $params['ts'] = $ts;
+  $params['sig'] = $signature;
+    
+  $qstring = "";
+  foreach( $params as $k => $v ) {
+    $qstring = $qstring . $k . "=" . $v . '&';
+  }
+  $url = "https://api.sandbox.jambool.com/socialgold/subscription/v1/" . $offer_id . "/" . 
+    $user_id . "/" . $action . "?" . $qstring;
+  return $url;
+}
+
+function check_and_edit_subscription_status() {
+  $status = get_subscription_status();
+  print "got status";
+  if( $status->{'subscription_status'} == 'active' ) {
+    print "is active";
+    // give user paid-subscriber role
+    $dude = wp_get_current_user();
+    print "getting role";
+    
+    $role =& get_role('paid-subscriber');
+    if( !isset( $role ) ) {
+      print "shit. didn't get role";
+    } else  {
+      print "got role ";
+      $dude->set_role( $role );
+      print "set role";
+    }
+  }
+  else {
+    // take it away
+  }
+
+}
+function get_subscription_status() {
+  $url = _construct_subscriptions_url( "status", array() );
+  print $url . "<br/>";
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_USERAGENT, 'ContenGold' );
+  $result = curl_exec($ch);
+  $responseInfo = curl_getinfo($ch);
+  curl_close($ch);
+  return json_decode( $result );
+
+}
+
 
 function _calculateSGSignature( $params, $secret ) {
    $keys = array_keys( $params );
@@ -132,5 +215,3 @@ function _calculateSGSignature( $params, $secret ) {
    return $sig;
  }
 ?>
-
-
