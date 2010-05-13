@@ -81,6 +81,8 @@ function contentgold_get_prefix_default( $action = '' ) {
     $prefix = $baseurl . "contentgold/" . $action;
     return $prefix;
 }
+
+
 add_action('admin_menu', 'contentgold_plugin_menu');
 function contentgold_plugin_menu() {
   add_options_page('ContentGold Options', 'Content Gold Plugin', 'edit_plugins', 'contentgold-plugin-menu', 'contentgold_settings_page');
@@ -167,26 +169,21 @@ function display_subscription_frame() {
 		   "user_id" => $user_id
 		   );
   $signature =_calculateSGSignature( $sigparams, $merchant_secret );
-  if (isset($offer_id) && ($user_id != 0)) {
+
 ?>
     <iframe src="https://api.sandbox.jambool.com/socialgold/subscription/v1/<?php echo $offer_id; ?>/<?php echo $user_id ?>/show_form?ts=<?php echo $ts ?>&sig=<?php echo $signature ?>" width="430" height="400" scrolling="no" style="border: 1px solid #ccc;"></iframe>
 <?php
-  } else {
-?>
-  <p>Please register to access premium content</p>
-<?php
-  }
 }
 
 
 function _construct_subscriptions_url( $action, $params ) {
   $offer_id = get_option('offer_id');
   $merchant_secret = get_option('merchant_secret');
+
+  $offer_id = get_option('offer_id');
+  $merchant_secret = get_option('merchant_secret');
   $dude = wp_get_current_user();
   $user_id = $dude->ID;
-  if (! (isset($offer_id) && ($user_id != 0))) {
-    return NULL;
-  }
   $ts = time();
 
   $sparams = $params;
@@ -212,25 +209,20 @@ function _construct_subscriptions_url( $action, $params ) {
 
 function check_and_edit_subscription_status() {
   $status = get_subscription_status();
-  if (is_null($status)) {
-    return;
-  }
+  $s = $status->{'subscription_status'};
   $dude = wp_get_current_user();
   if( $status->{'subscription_status'} == 'active' ) {
     // give user paid-subscriber role
-    $dude->set_role( 'paid-subscriber' );
+    if( $dude->has_cap( 'subscriber' ) ) $dude->set_role( 'paid-subscriber' );
   } else {
     // take it away
-    $dude->set_role( 'subscriber' );
+    if( $dude->has_cap( 'paid-subscriber' ) ) $dude->set_role( 'subscriber' );
   }
-
 }
+
 function get_subscription_status() {
   $url = _construct_subscriptions_url( "status", array() );
-  if (is_null( $url )) {
-    return NULL;
-  }
-  //  print $url . "<br/>";
+  // print $url . "<br/>";
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
