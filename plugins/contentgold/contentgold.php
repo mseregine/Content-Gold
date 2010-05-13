@@ -2,12 +2,13 @@
 /*
 Plugin Name: ContentGold
 Plugin URI: http://www.socialgold.net
-Description: blah
-Version: The Plugin's Version Number, e.g.: 1.0
-Author: Name Of The Plugin Author
-Author URI: http://URI_Of_The_Plugin_Author
-License: A "Slug" license name e.g. GPL2
+Description: Pay Wall
+Version: 0.1
+Author: Mikhail Seregine, Hemant Bhanoo
+License: TBD
 */
+
+  /* Basic setup stuff */
 
 function setup_paid_subscriber_role() {
   $role =& get_role('paid-subscriber');
@@ -43,7 +44,42 @@ function unsetup_paid_subscriber_role() {
 register_activation_hook( __FILE__, 'setup_paid_subscriber_role' );
 register_deactivation_hook( __FILE__, 'unsetup_paid_subscriber_role' );
 
+/* Plugin Administration */
 
+add_action( "wp", 'check_for_postback' );
+function check_for_postback() {
+  // need to figure out how not to send the rest of the page
+    $uri = $_SERVER['REQUEST_URI'];
+    $postback = contentgold_get_prefix_default('postback');
+    $complete = contentgold_get_prefix_default('complete');
+    $subscribe = contentgold_get_prefix_default('subscribe');
+    if(preg_match("!^{$postback}!", $uri, $m)) {
+      check_and_edit_subscription_status();
+      print "cool";
+    } else if( preg_match("!^{$complete}!", $uri, $m)) {
+      check_and_edit_subscription_status();
+      wp_redirect("http://www.google.com", 301);
+    } else if( preg_match("!^{$subscribe}!", $uri, $m)) {
+      check_and_edit_subscription_status();
+    }
+}
+
+
+function contentgold_get_prefix_default( $action = '' ) {
+    $siteurl = get_bloginfo('url');
+    $baseurl = preg_replace('!^[A-Za-z]+://[^/]*!', '', $siteurl);
+    if (!preg_match('!^/!', $baseurl)) {
+        $baseurl = '/' . $baseurl;
+    }
+    if (!preg_match('!/$!', $baseurl)) {
+        $baseurl .= '/';
+    }
+    $prefix = $baseurl . "contentgold/" . $action;
+    return $prefix;
+}
+
+
+add_action('admin_menu', 'contentgold_plugin_menu');
 function contentgold_plugin_menu() {
   add_options_page('ContentGold Options', 'Content Gold Plugin', 'edit_plugins', 'contentgold-plugin-menu', 'contentgold_settings_page');
 
@@ -100,7 +136,21 @@ function contentgold_settings_page() {
 <?php
 }
 
-add_action('admin_menu', 'contentgold_plugin_menu');
+/*
+ footer
+*/
+
+add_action( 'wp_footer', 'show_subscription_frame_in_footer' );
+function show_subscription_frame_in_footer() {
+  check_and_edit_subscription_status();
+  display_subscription_frame();
+}
+
+
+
+
+/* subscription frame */
+
 function display_subscription_frame() {
 
   $offer_id = get_option('offer_id');
@@ -117,7 +167,7 @@ function display_subscription_frame() {
   $signature =_calculateSGSignature( $sigparams, $merchant_secret );
   if (isset($offer_id) && ($user_id != 0)) {
 ?>
-  <iframe src="https://api.sandbox.jambool.com/socialgold/subscription/v1/<?php echo $offer_id; ?>/<?php echo $user_id ?>/show_form?ts=<?php echo $ts ?>&sig=<?php echo $signature ?>" width="430" height="400" scrolling="no" style="border: 1px solid #ccc;"></iframe>
+    <iframe src="https://api.sandbox.jambool.com/socialgold/subscription/v1/<?php echo $offer_id; ?>/<?php echo $user_id ?>/show_form?ts=<?php echo $ts ?>&sig=<?php echo $signature ?>" width="430" height="400" scrolling="no" style="border: 1px solid #ccc;"></iframe>
 <?php
   } else {
 ?>
@@ -126,16 +176,6 @@ function display_subscription_frame() {
   }
 }
 
-
-/*
- footer
-*/
-
-add_action( 'wp_footer', 'show_subscription_frame_in_footer' );
-function show_subscription_frame_in_footer() {
-  check_and_edit_subscription_status();
-  display_subscription_frame();
-}
 
 function _construct_subscriptions_url( $action, $params ) {
   $offer_id = get_option('offer_id');
