@@ -48,19 +48,23 @@ register_deactivation_hook( __FILE__, 'unsetup_paid_subscriber_role' );
 
 add_action( "wp", 'check_for_postback' );
 function check_for_postback() {
-  // need to figure out how not to send the rest of the page
+  // clean up this function please.
     $uri = $_SERVER['REQUEST_URI'];
     $postback = contentgold_get_prefix_default('postback');
     $complete = contentgold_get_prefix_default('complete');
     $subscribe = contentgold_get_prefix_default('subscribe');
     if(preg_match("!^{$postback}!", $uri, $m)) {
+      // need to figure out how not to send the rest of the page
       check_and_edit_subscription_status();
       print "cool";
     } else if( preg_match("!^{$complete}!", $uri, $m)) {
+      // this works.
       check_and_edit_subscription_status();
-      wp_redirect("http://www.google.com", 301);
+      wp_redirect(get_bloginfo('url'), 302);
     } else if( preg_match("!^{$subscribe}!", $uri, $m)) {
+      // butfugly; improve please:
       check_and_edit_subscription_status();
+      display_subscription_frame();
     }
 }
 
@@ -77,8 +81,6 @@ function contentgold_get_prefix_default( $action = '' ) {
     $prefix = $baseurl . "contentgold/" . $action;
     return $prefix;
 }
-
-
 add_action('admin_menu', 'contentgold_plugin_menu');
 function contentgold_plugin_menu() {
   add_options_page('ContentGold Options', 'Content Gold Plugin', 'edit_plugins', 'contentgold-plugin-menu', 'contentgold_settings_page');
@@ -213,18 +215,13 @@ function check_and_edit_subscription_status() {
   if (is_null($status)) {
     return;
   }
+  $dude = wp_get_current_user();
   if( $status->{'subscription_status'} == 'active' ) {
     // give user paid-subscriber role
-    $dude = wp_get_current_user();
-    
-    $role =& get_role('paid-subscriber');
-    if( !isset( $role ) ) {
-    } else  {
-      $dude->set_role( 'paid-subscriber' );
-    }
-  }
-  else {
+    $dude->set_role( 'paid-subscriber' );
+  } else {
     // take it away
+    $dude->set_role( 'subscriber' );
   }
 
 }
